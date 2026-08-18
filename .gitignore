@@ -5,3 +5,6 @@
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
+
+# Python virtual environment
+.venv/
