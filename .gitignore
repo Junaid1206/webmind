@@ -8,3 +8,11 @@
 
 # Python virtual environment
 .venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
