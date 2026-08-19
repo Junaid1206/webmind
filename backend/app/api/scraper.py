@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from backend.app.schemas.scraper import ScrapeRequest, ScrapeResult
 from backend.app.services.scraper.brightdata_client import BrightDataClient
@@ -16,7 +16,10 @@ async def scrape(
     request: ScrapeRequest,
     service: ScraperService = Depends(get_scraper_service),
 ) -> ScrapeResult:
-    return await service.scrape(
-        url=str(request.url),
-        query=request.query,
-    )
+    try:
+        return await service.scrape(url=str(request.url), query=request.query)
+    except (RuntimeError, TimeoutError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scraping service is temporarily unavailable.",
+        ) from exc

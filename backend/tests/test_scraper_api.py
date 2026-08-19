@@ -45,3 +45,29 @@ def test_scrape_endpoint():
     assert body["quality_score"] == 0.8
 
     app.dependency_overrides.clear()
+
+
+def test_scrape_endpoint_returns_503_when_scraper_is_unavailable():
+    class FailingScraperService:
+        async def scrape(self, url: str, query: str | None = None) -> ScrapeResult:
+            raise RuntimeError("credential value must not reach clients")
+
+    app.dependency_overrides[get_scraper_service] = lambda: FailingScraperService()
+    response = TestClient(app).post("/api/v1/scrape", json={"url": "https://example.com"})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Scraping service is temporarily unavailable."
+    app.dependency_overrides.clear()
+
+
+def test_scrape_endpoint_rejects_invalid_urls():
+    response = TestClient(app).post("/api/v1/scrape", json={"url": "not-a-url"})
+
+    assert response.status_code == 422
+
+
+def test_dashboard_is_available():
+    response = TestClient(app).get("/")
+
+    assert response.status_code == 200
+    assert "Evidence-backed public-web research" in response.text

@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 
 from backend.app.api.scraper import router as scraper_router
 
@@ -9,6 +12,12 @@ app = FastAPI(
 )
 
 app.include_router(scraper_router)
+
+
+@app.get("/", include_in_schema=False)
+async def dashboard() -> FileResponse:
+    """Serve the lightweight research dashboard."""
+    return FileResponse(Path(__file__).with_name("static") / "index.html")
 
 
 @app.get("/health")

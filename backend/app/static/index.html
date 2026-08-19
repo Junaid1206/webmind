@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebMind</title>
+  <style>
+    body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 880px; padding: 0 1rem; color: #18212f; }
+    form, section { border: 1px solid #d7dce2; border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+    input, button { font: inherit; padding: .6rem; } input { min-width: 60%; } button { cursor: pointer; }
+    #status[hidden], #results[hidden] { display: none; } .error { color: #b42318; } pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h1>WebMind</h1>
+  <p>Evidence-backed public-web research.</p>
+  <form id="research-form">
+    <label>Target URL <input id="url" type="url" placeholder="https://example.com" required></label>
+    <label>Research query <input id="query" type="text" placeholder="Optional focus"></label>
+    <button type="submit">Research</button>
+  </form>
+  <p id="status" role="status" hidden></p>
+  <main id="results" hidden>
+    <section><h2>Research input</h2><p id="research-input"></p></section>
+    <section><h2>Final research report</h2><p id="report"></p></section>
+    <section><h2>Confidence</h2><p id="quality"></p></section>
+    <section><h2>Sources</h2><ul id="sources"></ul></section>
+    <section><h2>Claims</h2><pre id="claims"></pre></section>
+    <section><h2>Entities</h2><pre id="entities"></pre></section>
+    <section><h2>Evidence</h2><pre id="evidence"></pre></section>
+    <section><h2>Relationships</h2><pre id="relationships"></pre></section>
+  </main>
+  <script>
+    const form = document.querySelector('#research-form');
+    const status = document.querySelector('#status');
+    const results = document.querySelector('#results');
+    const output = id => document.querySelector(id);
+    const json = value => JSON.stringify(value || [], null, 2);
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      status.hidden = false; status.className = ''; status.textContent = 'Researching public sources...'; results.hidden = true;
+      const payload = { url: output('#url').value, query: output('#query').value || null };
+      try {
+        const response = await fetch('/api/v1/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || 'Research request failed.');
+        status.textContent = `Status: ${body.status}`;
+        const claims = body.data.claims || [];
+        const verifiedClaims = claims.filter(claim => claim.verification_status === 'verified').length;
+        output('#research-input').textContent = payload.query || payload.url;
+        output('#report').textContent = `${verifiedClaims} of ${claims.length} extracted claims are verified against their source evidence.`;
+        output('#quality').textContent = `${Math.round(body.quality_score * 100)}%`;
+        output('#sources').replaceChildren(...body.sources.map(source => {
+          const item = document.createElement('li'); const link = document.createElement('a');
+          link.href = source.url; link.textContent = source.title || source.url; link.target = '_blank'; link.rel = 'noreferrer'; item.append(link); return item;
+        }));
+        output('#claims').textContent = json(claims);
+        output('#entities').textContent = json(body.data.entities);
+        output('#evidence').textContent = json(body.data.evidence);
+        output('#relationships').textContent = json(body.data.relationships);
+        results.hidden = false;
+      } catch (error) { status.className = 'error'; status.textContent = error.message; }
+    });
+  </script>
+</body>
+</html>
