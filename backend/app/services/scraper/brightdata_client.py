@@ -73,6 +73,8 @@ class BrightDataClient:
                 return {"records": data}
             if not isinstance(data, dict):
                 raise RuntimeError("Bright Data returned an unsupported collector result.")
+            if str(data.get("status", "")).lower() in {"failed", "error", "cancelled", "canceled"}:
+                raise RuntimeError("Bright Data collector failed.")
             if attempt < self._MAX_POLL_ATTEMPTS - 1:
                 await asyncio.sleep(self._POLL_INTERVAL_SECONDS)
         raise TimeoutError("Bright Data collector run timed out.")

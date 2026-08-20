@@ -145,6 +145,23 @@ async def test_scrape_rejects_malformed_polling_response(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_scrape_rejects_terminal_collector_failure(monkeypatch):
+    configure_client(monkeypatch)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/dca/trigger":
+            return httpx.Response(200, json={"collection_id": "j_run"})
+        return httpx.Response(200, json={"status": "failed", "error": "secret details"})
+
+    client = BrightDataClient(transport=httpx.MockTransport(handler))
+
+    with pytest.raises(RuntimeError, match="Bright Data collector failed") as exc_info:
+        await client.scrape("https://example.com")
+
+    assert "secret" not in str(exc_info.value)
+
+
+@pytest.mark.asyncio
 async def test_scrape_times_out_when_collector_never_returns_a_dataset(monkeypatch):
     configure_client(monkeypatch)
 

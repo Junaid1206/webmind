@@ -27,10 +27,14 @@
   </section>
   <main id="results" hidden>
     <section><h2>Research input</h2><p id="research-input"></p></section>
-    <section><h2>Final research report</h2><p id="report"></p></section>
+    <section><h2 id="report-title">Final research report</h2><p id="report"></p><p id="summary"></p></section>
+    <section><h2>Key findings</h2><ul id="key-findings"></ul></section>
+    <section><h2>Limitations</h2><ul id="limitations"></ul></section>
     <section><h2>Confidence</h2><p id="quality"></p></section>
     <section><h2>Sources</h2><ul id="sources"></ul></section>
+    <section><h2>Evidence references</h2><ul id="evidence-refs"></ul></section>
     <section><h2>Claims</h2><pre id="claims"></pre></section>
+    <section><h2>Claim verification</h2><pre id="verification-status"></pre></section>
     <section><h2>Entities</h2><pre id="entities"></pre></section>
     <section><h2>Evidence</h2><pre id="evidence"></pre></section>
     <section><h2>Relationships</h2><pre id="relationships"></pre></section>
@@ -52,19 +56,24 @@
       status.hidden = false; status.className = isError ? 'error' : ''; status.textContent = message;
     };
     const showResult = body => {
-      const claims = body.result.data.claims || [];
-      const verifiedClaims = claims.filter(claim => claim.verification_status === 'verified').length;
       output('#research-input').textContent = body.query || body.url;
-      output('#report').textContent = `${verifiedClaims} of ${claims.length} extracted claims are verified against their source evidence.`;
-      output('#quality').textContent = `${Math.round(body.result.quality_score * 100)}%`;
-      output('#sources').replaceChildren(...body.result.sources.map(source => {
+      output('#report-title').textContent = body.title || 'Final research report';
+      output('#report').textContent = body.report || 'No synthesized report was available.';
+      output('#summary').textContent = body.summary || '';
+      output('#quality').textContent = body.confidence == null ? 'Unavailable' : `${Math.round(body.confidence * 100)}%`;
+      const claims = body.claims || body.result.data.claims || [];
+      output('#key-findings').replaceChildren(...(body.key_findings || []).map(item => { const li = document.createElement('li'); li.textContent = item; return li; }));
+      output('#limitations').replaceChildren(...(body.limitations || []).map(item => { const li = document.createElement('li'); li.textContent = item; return li; }));
+      output('#sources').replaceChildren(...(body.sources || body.result.sources || []).map(source => {
         const item = document.createElement('li'); const link = document.createElement('a');
         link.href = source.url; link.textContent = source.title || source.url; link.target = '_blank'; link.rel = 'noreferrer'; item.append(link); return item;
       }));
+      output('#evidence-refs').replaceChildren(...(body.evidence_refs || []).map(ref => { const li = document.createElement('li'); const link = document.createElement('a'); link.href = ref; link.textContent = ref; link.target = '_blank'; link.rel = 'noreferrer'; li.append(link); return li; }));
       output('#claims').textContent = json(claims);
-      output('#entities').textContent = json(body.result.data.entities);
+      output('#verification-status').textContent = json(claims.map(claim => ({ id: claim.id, verification_status: claim.verification_status })));
+      output('#entities').textContent = json(body.entities || body.result.data.entities);
       output('#evidence').textContent = json(body.result.data.evidence);
-      output('#relationships').textContent = json(body.result.data.relationships);
+      output('#relationships').textContent = json(body.relationships || body.result.data.relationships);
       results.hidden = false;
     };
     const loadJob = async jobId => {
@@ -74,7 +83,7 @@
         if (!response.ok) throw new Error(body.detail || 'Unable to retrieve research job.');
         showStatus(`Job ${body.job_id}: ${body.status}`, body.status === 'failed');
         if (body.status === 'completed' && body.result) { stopPolling(); submit.disabled = false; showResult(body); return; }
-        if (body.status === 'failed') { stopPolling(); submit.disabled = false; return; }
+        if (body.status === 'failed') { stopPolling(); submit.disabled = false; showStatus(body.error || 'Research job failed.', true); return; }
         pollTimer = window.setTimeout(() => loadJob(jobId), 1500);
       } catch (error) { stopPolling(); submit.disabled = false; showStatus('Unable to retrieve research status. Please try again.', true); }
     };

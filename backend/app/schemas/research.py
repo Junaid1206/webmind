@@ -23,6 +23,17 @@ class ResearchJobResponse(BaseModel):
     query: str | None = None
     result: ScrapeResult | None = None
     error: str | None = None
+    title: str | None = None
+    report: str | None = None
+    summary: str | None = None
+    key_findings: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=list)
+    confidence: float | None = None
+    claims: list[dict] = Field(default_factory=list)
+    entities: list[dict] = Field(default_factory=list)
+    relationships: list[dict] = Field(default_factory=list)
+    sources: list[dict] = Field(default_factory=list)
 
 
 class ResearchHistoryResponse(BaseModel):
