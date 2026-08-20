@@ -71,3 +71,5 @@ def test_dashboard_is_available():
 
     assert response.status_code == 200
     assert "Evidence-backed public-web research" in response.text
+    assert "/api/v1/research" in response.text
+    assert "Research history" in response.text

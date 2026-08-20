@@ -17,9 +17,14 @@
   <form id="research-form">
     <label>Target URL <input id="url" type="url" placeholder="https://example.com" required></label>
     <label>Research query <input id="query" type="text" placeholder="Optional focus"></label>
-    <button type="submit">Research</button>
+    <button id="submit" type="submit">Start Research</button>
   </form>
   <p id="status" role="status" hidden></p>
+  <section>
+    <h2>Research history</h2>
+    <p id="history-empty" hidden>No research jobs yet.</p>
+    <ul id="history"></ul>
+  </section>
   <main id="results" hidden>
     <section><h2>Research input</h2><p id="research-input"></p></section>
     <section><h2>Final research report</h2><p id="report"></p></section>
@@ -36,32 +41,69 @@
     const results = document.querySelector('#results');
     const output = id => document.querySelector(id);
     const json = value => JSON.stringify(value || [], null, 2);
+    const submit = output('#submit');
+    let pollTimer = null;
+
+    const stopPolling = () => {
+      if (pollTimer) window.clearTimeout(pollTimer);
+      pollTimer = null;
+    };
+    const showStatus = (message, isError = false) => {
+      status.hidden = false; status.className = isError ? 'error' : ''; status.textContent = message;
+    };
+    const showResult = body => {
+      const claims = body.result.data.claims || [];
+      const verifiedClaims = claims.filter(claim => claim.verification_status === 'verified').length;
+      output('#research-input').textContent = body.query || body.url;
+      output('#report').textContent = `${verifiedClaims} of ${claims.length} extracted claims are verified against their source evidence.`;
+      output('#quality').textContent = `${Math.round(body.result.quality_score * 100)}%`;
+      output('#sources').replaceChildren(...body.result.sources.map(source => {
+        const item = document.createElement('li'); const link = document.createElement('a');
+        link.href = source.url; link.textContent = source.title || source.url; link.target = '_blank'; link.rel = 'noreferrer'; item.append(link); return item;
+      }));
+      output('#claims').textContent = json(claims);
+      output('#entities').textContent = json(body.result.data.entities);
+      output('#evidence').textContent = json(body.result.data.evidence);
+      output('#relationships').textContent = json(body.result.data.relationships);
+      results.hidden = false;
+    };
+    const loadJob = async jobId => {
+      try {
+        const response = await fetch(`/api/v1/research/${jobId}`);
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || 'Unable to retrieve research job.');
+        showStatus(`Job ${body.job_id}: ${body.status}`, body.status === 'failed');
+        if (body.status === 'completed' && body.result) { stopPolling(); submit.disabled = false; showResult(body); return; }
+        if (body.status === 'failed') { stopPolling(); submit.disabled = false; return; }
+        pollTimer = window.setTimeout(() => loadJob(jobId), 1500);
+      } catch (error) { stopPolling(); submit.disabled = false; showStatus('Unable to retrieve research status. Please try again.', true); }
+    };
+    const loadHistory = async () => {
+      try {
+        const response = await fetch('/api/v1/research?limit=20');
+        const body = await response.json();
+        if (!response.ok) throw new Error();
+        output('#history-empty').hidden = body.items.length !== 0;
+        output('#history').replaceChildren(...body.items.map(job => {
+          const item = document.createElement('li'); const button = document.createElement('button');
+          button.type = 'button'; button.textContent = `${job.status}: ${job.query || job.url}`;
+          button.addEventListener('click', () => { stopPolling(); results.hidden = true; loadJob(job.job_id); }); item.append(button); return item;
+        }));
+      } catch (_) { output('#history-empty').hidden = false; output('#history-empty').textContent = 'Research history is unavailable.'; }
+    };
 
     form.addEventListener('submit', async event => {
       event.preventDefault();
-      status.hidden = false; status.className = ''; status.textContent = 'Researching public sources...'; results.hidden = true;
+      stopPolling(); showStatus('Submitting research job...'); results.hidden = true; submit.disabled = true;
       const payload = { url: output('#url').value, query: output('#query').value || null };
       try {
-        const response = await fetch('/api/v1/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const response = await fetch('/api/v1/research', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         const body = await response.json();
         if (!response.ok) throw new Error(body.detail || 'Research request failed.');
-        status.textContent = `Status: ${body.status}`;
-        const claims = body.data.claims || [];
-        const verifiedClaims = claims.filter(claim => claim.verification_status === 'verified').length;
-        output('#research-input').textContent = payload.query || payload.url;
-        output('#report').textContent = `${verifiedClaims} of ${claims.length} extracted claims are verified against their source evidence.`;
-        output('#quality').textContent = `${Math.round(body.quality_score * 100)}%`;
-        output('#sources').replaceChildren(...body.sources.map(source => {
-          const item = document.createElement('li'); const link = document.createElement('a');
-          link.href = source.url; link.textContent = source.title || source.url; link.target = '_blank'; link.rel = 'noreferrer'; item.append(link); return item;
-        }));
-        output('#claims').textContent = json(claims);
-        output('#entities').textContent = json(body.data.entities);
-        output('#evidence').textContent = json(body.data.evidence);
-        output('#relationships').textContent = json(body.data.relationships);
-        results.hidden = false;
-      } catch (error) { status.className = 'error'; status.textContent = error.message; }
+        showStatus(`Job ${body.job_id}: ${body.status}`); loadHistory(); loadJob(body.job_id);
+      } catch (_) { submit.disabled = false; showStatus('Unable to start research. Check the URL and try again.', true); }
     });
+    loadHistory();
   </script>
 </body>
 </html>

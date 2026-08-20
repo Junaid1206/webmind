@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
 from backend.app.api.scraper import router as scraper_router
+from backend.app.api.research import router as research_router
 
 app = FastAPI(
     title="WebMind API",
@@ -12,6 +13,7 @@ app = FastAPI(
 )
 
 app.include_router(scraper_router)
+app.include_router(research_router)
 
 
 @app.get("/", include_in_schema=False)
