@@ -2,6 +2,10 @@
 .env
 .env.local
 .env.*.local
+*.db
+*.sqlite
+*.sqlite3
+.swarm/*.db
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
