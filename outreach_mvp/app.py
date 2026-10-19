@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-load_dotenv()
+load_dotenv(Path(__file__).with_name(".env"))
 DB_PATH = os.getenv("DATABASE_PATH", "./outreach.db")
 AUTO_SEND_ENABLED = os.getenv("AUTO_SEND_ENABLED", "false").lower() == "true"
 DAILY_SEND_LIMIT = max(1, int(os.getenv("DAILY_SEND_LIMIT", "10")))
